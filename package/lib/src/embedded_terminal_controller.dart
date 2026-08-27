@@ -21,7 +21,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:xterm/xterm.dart';
 import 'pty/pty_session.dart';
 import 'pty/pty_factory.dart';
@@ -34,6 +37,9 @@ import 'terminal_events.dart';
 class EmbeddedTerminalController extends ChangeNotifier {
   /// The underlying xterm terminal instance.
   final Terminal terminal;
+
+  /// Controls terminal view interactions like selection and cursor style.
+  final TerminalController terminalController;
 
   PtySession? _ptySession;
   bool _isRunningProgrammatic = false;
@@ -56,7 +62,9 @@ class EmbeddedTerminalController extends ChangeNotifier {
   void Function(CmdRunErrorEvent)? onCmdRunError;
 
   /// Creates a new [EmbeddedTerminalController].
-  EmbeddedTerminalController() : terminal = Terminal() {
+  EmbeddedTerminalController()
+      : terminal = Terminal(),
+        terminalController = TerminalController() {
     // Forward user keystrokes from the terminal emulator to the PTY session.
     terminal.onOutput = (data) {
       write(data);
@@ -238,6 +246,59 @@ class EmbeddedTerminalController extends ChangeNotifier {
   /// Clears the terminal screen.
   Future<void> clear() async {
     terminal.write('\x1B[2J\x1B[H');
+  }
+
+  /// Extracts the plain text content of the terminal. If there is a text selection,
+  /// returns the selected text; otherwise, returns the entire active buffer content.
+  String getTerminalText() {
+    final selection = terminalController.selection;
+    if (selection != null) {
+      return terminal.buffer.getText(selection);
+    }
+
+    final buffer = StringBuffer();
+    final linesCount = terminal.buffer.lines.length;
+    for (var i = 0; i < linesCount; i++) {
+      final line = terminal.buffer.lines[i];
+      // Get only the trimmed content from the cell buffer up to the last non-empty column
+      final lineText = line.getText(0, line.getTrimmedLength());
+      buffer.write(lineText);
+      // Append a newline only if the current line does not overflow/wrap to the next
+      if (!line.isWrapped && i < linesCount - 1) {
+        buffer.write('\n');
+      }
+    }
+    return buffer.toString();
+  }
+
+  /// Programmatically copies the entire terminal text to the system clipboard.
+  Future<void> copyToClipboard() async {
+    final text = getTerminalText();
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  /// Programmatically saves the entire terminal text to a text file.
+  /// Shows a native save file dialog. Returns true if the file was saved,
+  /// and false if the dialog was cancelled or saving failed.
+  Future<bool> exportTerminalText() async {
+    try {
+      final text = getTerminalText();
+      final outputFile = await FilePicker.saveFile(
+        dialogTitle: 'Export Terminal Output',
+        fileName: 'terminal_export.txt',
+        type: FileType.custom,
+        allowedExtensions: ['txt'],
+      );
+
+      if (outputFile != null) {
+        final file = File(outputFile);
+        await file.writeAsString(text);
+        return true;
+      }
+    } catch (_) {
+      // Return false on error
+    }
+    return false;
   }
 
   /// Programmatically writes raw input data directly to the PTY process.

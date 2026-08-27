@@ -57,6 +57,8 @@ A `StatefulWidget` wrapping the terminal emulator renderer.
 | `onCmdRunStart` | `void Function(CmdRunStartEvent)?` | Callback triggered when a programmatic command starts running. | `null` |
 | `onCmdRunComplete` | `void Function(CmdRunCompleteEvent)?` | Callback triggered when a programmatic command completes. | `null` |
 | `onCmdRunError` | `void Function(CmdRunErrorEvent)?` | Callback triggered when a programmatic command execution fails. | `null` |
+| `enableCopy` | `bool` | Renders a minimalist floating copy button in the top-right corner. Automatically copies only the selected text if a selection is active. | `false` |
+| `enableExport` | `bool` | Renders a minimalist floating save icon button in the top-right corner to save text to a file. Automatically exports only the selected text if a selection is active. | `false` |
 
 ---
 
@@ -68,6 +70,7 @@ The controller managing the active processes and xterm terminal states.
 *   `String? get currentCommand`: Returns the currently running programmatic command, or `null` if idle.
 *   `String? get workingDirectory` / `set workingDirectory(String?)`: Gets or sets the active directory. Changing this resets the interactive shell prompt location.
 *   `bool get isInteractive` / `set isInteractive(bool)`: Gets or sets the interactive state. Turning this off cleans up the interactive background shell.
+*   `TerminalController terminalController`: The controller managing terminal view interactions (such as text selection ranges and cursor state).
 
 #### Methods
 *   `Future<void> runCommand(String command, {String? workingDirectory, Map<String, String>? environment})`: Runs a specific shell command programmatically. Stops the background shell if active.
@@ -76,6 +79,9 @@ The controller managing the active processes and xterm terminal states.
 *   `Future<void> clear()`: Clears the terminal screen.
 *   `Future<void> write(String input)`: Writes raw input data directly to the PTY process (independent of widget interactivity).
 *   `Future<void> resize(int columns, int rows)`: Manually triggers a resize of the underlying PTY.
+*   `String getTerminalText()`: Extracts the current plain text buffer. If a text selection is active, returns only the selected text.
+*   `Future<void> copyToClipboard()`: Copies the terminal text (or selection) to the system clipboard.
+*   `Future<bool> exportTerminalText()`: Opens a native save file dialog to export the terminal text (or selection) to a `.txt` file. Returns `true` if successful.
 
 ---
 

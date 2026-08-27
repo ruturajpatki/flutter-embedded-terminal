@@ -32,6 +32,8 @@ EmbeddedTerminal is a reusable Flutter package that provides:
 * 📡 Command lifecycle events
 * 📁 Configurable working directories
 * 🌍 Windows, macOS, and Linux support
+* 📋 Configurable copy button to copy the entire terminal buffer or only the selected text to the clipboard
+* 💾 Configurable save to file button to export the entire terminal buffer or only the selected text to a text file
 
 The package hides the complexity of process management, PTY handling, terminal emulation, and platform-specific implementation behind a simple Flutter API.
 

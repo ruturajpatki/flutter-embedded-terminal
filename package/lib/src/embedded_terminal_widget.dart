@@ -19,6 +19,7 @@
  * limitations under the License.
  */
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 import 'embedded_terminal_controller.dart';
@@ -58,6 +59,12 @@ class EmbeddedTerminal extends StatefulWidget {
   /// Lifecycle callback triggered when a command fails to start or run.
   final void Function(CmdRunErrorEvent)? onCmdRunError;
 
+  /// Whether to show a copy icon button in the top-right corner.
+  final bool enableCopy;
+
+  /// Whether to show an export icon button in the top-right corner.
+  final bool enableExport;
+
   const EmbeddedTerminal({
     super.key,
     required this.controller,
@@ -69,6 +76,8 @@ class EmbeddedTerminal extends StatefulWidget {
     this.onCmdRunStart,
     this.onCmdRunComplete,
     this.onCmdRunError,
+    this.enableCopy = false,
+    this.enableExport = false,
   });
 
   @override
@@ -76,6 +85,9 @@ class EmbeddedTerminal extends StatefulWidget {
 }
 
 class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
+  bool _copied = false;
+  Timer? _copyTimer;
+
   @override
   void initState() {
     super.initState();
@@ -104,6 +116,12 @@ class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
     super.didUpdateWidget(oldWidget);
     _syncCallbacks();
     _syncControllerProperties();
+  }
+
+  @override
+  void dispose() {
+    _copyTimer?.cancel();
+    super.dispose();
   }
 
   void _syncCallbacks() {
@@ -154,13 +172,106 @@ class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
         widget.textStyle ??
         const TerminalStyle(fontFamily: 'monospace', fontSize: 13.0);
 
-    return TerminalView(
-      widget.controller.terminal,
-      theme: effectiveTheme,
-      textStyle: effectiveTextStyle,
-      readOnly: !widget.isInteractive,
-      autofocus: true,
-      hardwareKeyboardOnly: true,
+    final showToolbar = widget.enableCopy || widget.enableExport;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: TerminalView(
+            widget.controller.terminal,
+            controller: widget.controller.terminalController,
+            theme: effectiveTheme,
+            textStyle: effectiveTextStyle,
+            readOnly: !widget.isInteractive,
+            autofocus: true,
+            hardwareKeyboardOnly: true,
+          ),
+        ),
+        if (showToolbar)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              decoration: BoxDecoration(
+                color: effectiveTheme.background.withAlpha(179),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: effectiveTheme.foreground.withAlpha(38),
+                  width: 1,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.enableCopy)
+                    Tooltip(
+                      message: 'Copy all text',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () async {
+                          await widget.controller.copyToClipboard();
+                          if (mounted) {
+                            setState(() {
+                              _copied = true;
+                            });
+                            _copyTimer?.cancel();
+                            _copyTimer = Timer(const Duration(seconds: 2), () {
+                              if (mounted) {
+                                setState(() {
+                                  _copied = false;
+                                });
+                              }
+                            });
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(6.0),
+                          child: Icon(
+                            _copied ? Icons.check : Icons.copy_outlined,
+                            size: 16,
+                            color: _copied
+                                ? const Color(0xFF98C379) // Green matching green theme color
+                                : effectiveTheme.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (widget.enableCopy && widget.enableExport)
+                    const SizedBox(width: 4),
+                  if (widget.enableExport)
+                    Tooltip(
+                      message: 'Export text to file',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () async {
+                          final saved = await widget.controller.exportTerminalText();
+                          if (!context.mounted) return;
+                          if (saved) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Terminal output exported successfully.'),
+                                backgroundColor: Color(0xFF98C379),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(6.0),
+                          child: Icon(
+                            Icons.save_outlined,
+                            size: 16,
+                            color: effectiveTheme.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

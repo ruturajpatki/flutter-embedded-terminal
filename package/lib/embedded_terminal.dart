@@ -24,4 +24,4 @@ export 'src/embedded_terminal_controller.dart';
 export 'src/terminal_events.dart';
 
 // Export styling details from xterm so callers can theme without adding xterm to their pubspec.
-export 'package:xterm/xterm.dart' show TerminalTheme, TerminalStyle;
+export 'package:xterm/xterm.dart' show TerminalTheme, TerminalStyle, TerminalController;

@@ -46,6 +46,8 @@ class _TerminalDemoScreenState extends State<TerminalDemoScreen> {
 
   String? _workingDirectory;
   bool _isInteractive = true;
+  bool _enableCopy = true;
+  bool _enableExport = true;
   String _currentStatus = 'Idle'; // Idle, Running, Completed, Failed, Stopped
   final List<String> _eventLogs = [];
   final ScrollController _logScrollController = ScrollController();
@@ -404,6 +406,60 @@ class _TerminalDemoScreenState extends State<TerminalDemoScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+
+                    // Enable Copy switch
+                    Row(
+                      children: [
+                        const Text(
+                          'Enable Copy Button',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFABB2BF),
+                          ),
+                        ),
+                        const Spacer(),
+                        Switch(
+                          value: _enableCopy,
+                          activeThumbColor: const Color(0xFF56B6C2),
+                          onChanged: (val) {
+                            setState(() {
+                              _enableCopy = val;
+                            });
+                            _logEvent(
+                              'Copy button switched to: ${val ? "ENABLED" : "DISABLED"}',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Enable Export switch
+                    Row(
+                      children: [
+                        const Text(
+                          'Enable Export Button',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFABB2BF),
+                          ),
+                        ),
+                        const Spacer(),
+                        Switch(
+                          value: _enableExport,
+                          activeThumbColor: const Color(0xFF56B6C2),
+                          onChanged: (val) {
+                            setState(() {
+                              _enableExport = val;
+                            });
+                            _logEvent(
+                              'Export button switched to: ${val ? "ENABLED" : "DISABLED"}',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 32),
 
                     // Controls Buttons
@@ -461,6 +517,55 @@ class _TerminalDemoScreenState extends State<TerminalDemoScreen> {
                                     ? const Color(0xFFD19A66)
                                     : const Color(0xFF3E4451),
                               ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await _controller.copyToClipboard();
+                              _logEvent('Triggered copy to clipboard programmatically');
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Copied terminal output to clipboard (Controller API)'),
+                                    backgroundColor: Color(0xFF98C379),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.content_copy),
+                            label: const Text('Copy (API)'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFABB2BF),
+                              side: const BorderSide(color: Color(0xFF3E4451)),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final saved = await _controller.exportTerminalText();
+                              if (saved) {
+                                _logEvent('Exported terminal output programmatically');
+                              } else {
+                                _logEvent('Export terminal output cancelled or failed');
+                              }
+                            },
+                            icon: const Icon(Icons.download),
+                            label: const Text('Export (API)'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFABB2BF),
+                              side: const BorderSide(color: Color(0xFF3E4451)),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
                           ),
@@ -563,6 +668,8 @@ class _TerminalDemoScreenState extends State<TerminalDemoScreen> {
                         controller: _controller,
                         isInteractive: _isInteractive,
                         workingDirectory: _workingDirectory,
+                        enableCopy: _enableCopy,
+                        enableExport: _enableExport,
                         onCmdRunStart: (event) {
                           _logEvent(
                             'Start callback: "${event.command}" in "${event.workingDirectory}"',
