@@ -1,6 +1,6 @@
 name: embedded_terminal
 description: "A reusable, cross-platform embedded terminal package for Flutter Desktop."
-version: 1.0.0
+version: 1.2.0
 homepage:
 
 environment:

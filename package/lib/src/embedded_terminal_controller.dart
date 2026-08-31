@@ -67,6 +67,13 @@ class EmbeddedTerminalController extends ChangeNotifier {
         terminalController = TerminalController() {
     // Forward user keystrokes from the terminal emulator to the PTY session.
     terminal.onOutput = (data) {
+      if (data == '\x03' && hasSelection) {
+        copyToClipboard();
+        return;
+      }
+      if (!_isInteractive) {
+        return;
+      }
       write(data);
     };
   }
@@ -246,6 +253,13 @@ class EmbeddedTerminalController extends ChangeNotifier {
   /// Clears the terminal screen.
   Future<void> clear() async {
     terminal.write('\x1B[2J\x1B[H');
+  }
+
+  /// Returns `true` if there is an active, non-empty text selection in the terminal view.
+  bool get hasSelection {
+    final selection = terminalController.selection;
+    if (selection == null) return false;
+    return terminal.buffer.getText(selection).isNotEmpty;
   }
 
   /// Extracts the plain text content of the terminal. If there is a text selection,

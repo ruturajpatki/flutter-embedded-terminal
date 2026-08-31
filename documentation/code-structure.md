@@ -40,12 +40,12 @@ The root export file. It exposes the widget, controller, event classes, and sele
 *   **Role**: Handles the Flutter UI presentation.
 *   **Purpose**: Wraps xterm's `TerminalView` widget. It maps configurations (`isInteractive`, `workingDirectory`, `theme`, `textStyle`, `enableCopy`, `enableExport`) and hooks lifecycle callback events (`onCmdRunStart`, `onCmdRunComplete`, `onCmdRunError`) onto the controller.
 *   **Floating Toolbar**: Wraps the view in a `Stack` and overlays a minimalist floating toolbar in the top-right corner to allow copying text (with temporary checkmark feedback) or exporting text to a file.
-*   **Focus & Hardware Keys**: Sets `autofocus: true` and `hardwareKeyboardOnly: true` on desktop targets to avoid mobile virtual keyboard crashes and ensure stable input streams.
+*   **Focus & Pointer Interception**: Manages a dedicated `FocusNode` passed to `TerminalView` with `autofocus: true` and `hardwareKeyboardOnly: true`. Wraps the layout in a `Listener(onPointerDown: ...)` to immediately acquire keyboard focus whenever the user clicks or drags in the terminal view, ensuring keyboard shortcuts like `Ctrl+C`/`Cmd+C` are reliably captured even after interacting with external form controls or toggling read-only mode.
 
 #### `embedded_terminal_controller.dart`
 *   **Role**: Manages active sessions, state machine transitions, and utility commands.
 *   **Purpose**: Extends `ChangeNotifier` to coordinate starting, stopping, restarting, and resizing processes. When `isInteractive` is true and no programmatic task is running, it spawns a background interactive shell session. When a command is triggered via `runCommand`, it stops the background shell, executes the programmatic command, fires lifecycle events, and resumes the background shell prompt once complete.
-*   **Copy/Export Logic**: Integrates a `TerminalController` to monitor UI highlights and active text selections. Exposes `getTerminalText()`, `copyToClipboard()` (system clipboard integrations), and `exportTerminalText()` (spawns native file saving dialogs via `file_picker` to write `.txt` files) which automatically operate only on the selected text range if one is active.
+*   **Copy/Export Logic**: Integrates a `TerminalController` to monitor UI highlights and active text selections. Exposes `hasSelection`, `getTerminalText()`, `copyToClipboard()` (system clipboard integrations), and `exportTerminalText()` (spawns native file saving dialogs via `file_picker` to write `.txt` files). Automatically intercepts `Ctrl+C`/`Cmd+C` shortcuts when text selection is active to copy text without sending SIGINT (`\x03`) to the underlying running process.
 
 #### `terminal_events.dart`
 *   **Role**: Strong typing models.

@@ -20,6 +20,8 @@
  */
 
 import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:embedded_terminal/embedded_terminal.dart';
 import 'package:embedded_terminal/src/pty/pty_session.dart';
@@ -337,5 +339,122 @@ void main() {
 
       expect(shellPty.wasDisposed, isTrue);
     });
+  });
+
+  group('Conditional Ctrl+C Selection Handling Tests', () {
+    test('hasSelection returns false when selection is null or empty', () {
+      expect(controller.hasSelection, isFalse);
+    });
+
+    test('Ctrl+C without selection forwards 0x03 to PTY session', () async {
+      controller.isInteractive = true;
+      final runFuture = controller.runCommand('npm run dev');
+      final activePty = spawnedPtys.last;
+
+      // Simulate Ctrl+C input via terminal onOutput
+      controller.terminal.onOutput?.call('\x03');
+
+      expect(activePty.writtenInputs.contains('\x03'), isTrue);
+
+      activePty.simulateExit(0);
+      await runFuture;
+      await Future.delayed(const Duration(milliseconds: 10));
+    });
+
+    test(
+      'Ctrl+C with selection does NOT forward 0x03 to PTY session',
+      () async {
+        TestWidgetsFlutterBinding.ensureInitialized();
+        controller.isInteractive = true;
+        final runFuture = controller.runCommand('npm run dev');
+        final activePty = spawnedPtys.last;
+
+        // Write some text into terminal buffer
+        controller.terminal.write('Hello World\n');
+
+        // Set a selection on terminalController
+        controller.terminalController.setSelection(
+          controller.terminal.buffer.createAnchor(0, 0),
+          controller.terminal.buffer.createAnchor(5, 0),
+        );
+
+        expect(controller.hasSelection, isTrue);
+
+        // Simulate Ctrl+C input via terminal onOutput
+        controller.terminal.onOutput?.call('\x03');
+
+        // Verify \x03 was NOT sent to PTY session
+        expect(activePty.writtenInputs.contains('\x03'), isFalse);
+
+        activePty.simulateExit(0);
+        await runFuture;
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+    );
+
+    test(
+      'In non-interactive mode onOutput copies selection when Ctrl+C is pressed',
+      () async {
+        TestWidgetsFlutterBinding.ensureInitialized();
+        controller.isInteractive = false;
+        final runFuture = controller.runCommand('npm run dev');
+        final activePty = spawnedPtys.last;
+
+        controller.terminal.write('Sample Output Text\n');
+        controller.terminalController.setSelection(
+          controller.terminal.buffer.createAnchor(0, 0),
+          controller.terminal.buffer.createAnchor(6, 0),
+        );
+
+        expect(controller.hasSelection, isTrue);
+
+        // Simulate Ctrl+C input via terminal onOutput when non-interactive
+        controller.terminal.onOutput?.call('\x03');
+
+        // Verify \x03 was NOT sent to PTY session
+        expect(activePty.writtenInputs.contains('\x03'), isFalse);
+
+        activePty.simulateExit(0);
+        await runFuture;
+        await Future.delayed(const Duration(milliseconds: 10));
+      },
+    );
+
+    testWidgets(
+      'Ctrl+C on EmbeddedTerminal widget copies selection when isInteractive is false',
+      (tester) async {
+        controller.isInteractive = false;
+        controller.terminal.write('Sample Terminal Text\n');
+        controller.terminalController.setSelection(
+          controller.terminal.buffer.createAnchor(0, 0),
+          controller.terminal.buffer.createAnchor(6, 0),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: EmbeddedTerminal(
+                  controller: controller,
+                  isInteractive: false,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(controller.hasSelection, isTrue);
+
+        // Simulate Ctrl+C key press
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+
+        await tester.pumpAndSettle();
+      },
+    );
   });
 }

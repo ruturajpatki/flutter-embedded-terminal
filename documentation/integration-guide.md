@@ -70,6 +70,7 @@ The controller managing the active processes and xterm terminal states.
 *   `String? get currentCommand`: Returns the currently running programmatic command, or `null` if idle.
 *   `String? get workingDirectory` / `set workingDirectory(String?)`: Gets or sets the active directory. Changing this resets the interactive shell prompt location.
 *   `bool get isInteractive` / `set isInteractive(bool)`: Gets or sets the interactive state. Turning this off cleans up the interactive background shell.
+*   `bool get hasSelection`: Returns `true` if an active, non-empty text selection is present in the terminal view.
 *   `TerminalController terminalController`: The controller managing terminal view interactions (such as text selection ranges and cursor state).
 
 #### Methods

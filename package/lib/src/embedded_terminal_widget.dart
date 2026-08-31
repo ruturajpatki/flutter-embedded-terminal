@@ -21,6 +21,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 import 'embedded_terminal_controller.dart';
 import 'terminal_events.dart';
@@ -85,12 +86,14 @@ class EmbeddedTerminal extends StatefulWidget {
 }
 
 class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
+  late final FocusNode _focusNode;
   bool _copied = false;
   Timer? _copyTimer;
 
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
     _syncCallbacks();
     _syncControllerProperties();
 
@@ -120,8 +123,28 @@ class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _copyTimer?.cancel();
     super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      final isControlOrMeta =
+          HardwareKeyboard.instance.isControlPressed ||
+          HardwareKeyboard.instance.isMetaPressed;
+      if (isControlOrMeta && event.logicalKey == LogicalKeyboardKey.keyC) {
+        if (widget.controller.hasSelection) {
+          widget.controller.copyToClipboard();
+          return KeyEventResult.handled;
+        }
+        // In read-only mode (non-interactive), do not pass Ctrl+C to terminal
+        if (!widget.isInteractive) {
+          return KeyEventResult.handled;
+        }
+      }
+    }
+    return KeyEventResult.ignored;
   }
 
   void _syncCallbacks() {
@@ -174,16 +197,23 @@ class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
 
     final showToolbar = widget.enableCopy || widget.enableExport;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: TerminalView(
-            widget.controller.terminal,
-            controller: widget.controller.terminalController,
-            theme: effectiveTheme,
-            textStyle: effectiveTextStyle,
-            readOnly: !widget.isInteractive,
-            autofocus: true,
+    return Listener(
+      onPointerDown: (_) {
+        if (!_focusNode.hasFocus) {
+          _focusNode.requestFocus();
+        }
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: TerminalView(
+              widget.controller.terminal,
+              controller: widget.controller.terminalController,
+              focusNode: _focusNode,
+              theme: effectiveTheme,
+              textStyle: effectiveTextStyle,
+              readOnly: false,
+              autofocus: true,
             hardwareKeyboardOnly: true,
           ),
         ),
@@ -272,6 +302,7 @@ class _EmbeddedTerminalState extends State<EmbeddedTerminal> {
             ),
           ),
       ],
-    );
-  }
+    ),
+  );
+}
 }
